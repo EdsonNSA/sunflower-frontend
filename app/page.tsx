@@ -1,65 +1,93 @@
-import Image from "next/image";
+import React from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { 
+  Sun, 
+  MapPin, 
+  Zap, 
+  BarChart3, 
+  Clock, 
+  ArrowUpRight,
+  Wind,
+  Thermometer,
+  CloudSun
+} from "lucide-react"; // Usaremos Lucide para ícones modernos
 
-export default function Home() {
+export default function SunflowerDashboard() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="max-w-7xl mx-auto p-6 md:p-8 space-y-6 bg-sun-bg min-h-screen">
+      
+      {/* ── Topbar ── */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between border-b border-black/10 pb-5 gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-sun-green-600 rounded-full flex items-center justify-center text-sun-amber-400">
+            <Sun size={32} fill="currentColor" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight font-nunito text-sun-text">Sunflower</h1>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Análise de Viabilidade Solar</p>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white border border-black/10 px-3 py-1.5 rounded-full text-xs text-muted-foreground">
+            <div className="w-1.5 h-1.5 bg-sun-green-400 rounded-full animate-pulse" />
+            Coletando dados
+          </div>
+          <div className="bg-white border border-black/10 px-3 py-1.5 rounded-full text-xs text-muted-foreground">
+            17 abr 2026 · 11:42
+          </div>
         </div>
-      </main>
-    </div>
+      </header>
+
+      {/* ── Location Bar ── */}
+      <div className="flex items-center gap-2 bg-white p-3 rounded-lg border border-black/10 text-xs text-muted-foreground">
+        <MapPin size={14} className="text-sun-green-400" />
+        <span className="font-semibold text-sun-text">Belo Jardim, PE, Brasil</span>
+        <span className="opacity-40">|</span> lat -8.33° <span className="opacity-40">|</span> lon -36.42°
+        <span className="ml-auto bg-sun-green-50 text-sun-green-600 px-2 py-0.5 rounded-full font-medium">
+          Semiárido nordestino
+        </span>
+      </div>
+
+      {/* ── Verdict Card ── */}
+      <Card className="border-black/10 shadow-sm overflow-hidden">
+        <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
+          <div className="w-16 h-16 bg-sun-green-600 rounded-full flex items-center justify-center text-sun-green-50">
+             <Zap size={32} fill="currentColor" />
+          </div>
+          <div className="flex-1 space-y-1 text-center md:text-left">
+            <h2 className="text-xl font-extrabold font-nunito text-sun-text">Ótimo para instalação solar!</h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Esta região apresenta alta irradiação e ângulos favoráveis. O Sunflower garante o aproveitamento máximo desse potencial.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-5xl font-extrabold font-nunito text-sun-green-600">84</span>
+            <span className="text-[10px] uppercase tracking-tighter text-muted-foreground">viabilidade / 100</span>
+            <div className="w-32 h-1.5 bg-black/5 rounded-full overflow-hidden">
+              <div className="bg-sun-green-400 h-full w-[84%]" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── KPI Grid ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Energia hoje", val: "6.4", unit: "kWh/m²", delta: "+12%", warn: false },
+          { label: "Irradiação Pico", val: "891", unit: "W/m²", delta: "Alta", warn: false },
+          { label: "Sol Pleno", val: "9.1", unit: "Horas", delta: "Acima da média", warn: false },
+          { label: "Eficiência", val: "94%", unit: "Rastreio Ativo", delta: "Biaxial", warn: false },
+        ].map((kpi, i) => (
+          <div key={i} className="bg-white/50 border border-black/5 p-4 rounded-xl space-y-1">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{kpi.label}</p>
+            <h3 className="text-2xl font-bold text-sun-text">{kpi.val}</h3>
+            <p className="text-[10px] text-muted-foreground">{kpi.unit}</p>
+            <p className="text-[10px] font-bold text-sun-green-600 mt-2">{kpi.delta}</p>
+          </div>
+        ))}
+      </div>
+
+    </main>
   );
 }

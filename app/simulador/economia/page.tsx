@@ -49,15 +49,22 @@ export default function SimuladorDashboard() {
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Cabeçalho */}
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-gradient-to-br from-amber-200 to-orange-400 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 transform transition-transform hover:scale-105">
-            <Calculator size={28} strokeWidth={2.5} />
+        <header className="flex flex-col md:flex-row md:items-center justify-between border-b border-black/10 pb-5 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-16 bg-sun-green-600 rounded-full flex items-center justify-center text-sun-amber-400 shrink-0 shadow-md border border-black/5">
+              <Calculator size={36} strokeWidth={1.5} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight leading-none mb-1.5 text-sun-text">Simulador de Economia</h1>
+              <p className="text-[10px] font-bold text-[#6b6a64] uppercase tracking-[0.3em] opacity-80">
+                Projete seu retorno sobre investimento (ROI)
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Simulador de Economia</h1>
-            <p className="text-sm font-medium text-slate-500 uppercase tracking-widest mt-1">Projete seu retorno sobre investimento (ROI)</p>
-          </div>
-        </div>
+          <a href="/" className="text-[11px] font-black uppercase tracking-[0.15em] text-sun-green-600 hover:text-sun-green-700 transition-colors">
+            ← Voltar ao Dashboard
+          </a>
+        </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
@@ -153,7 +160,7 @@ export default function SimuladorDashboard() {
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-emerald-900">Economia no 1º Ano</h3>
                 </div>
-                <p className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-700 to-teal-500 relative z-10">
+                <p className="text-4xl xl:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-emerald-700 to-teal-500 relative z-10">
                   R$ {economiaAnual.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                 </p>
                 <div className="mt-4 inline-flex items-center gap-1.5 bg-white/60 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-700 w-fit relative z-10">
@@ -175,7 +182,7 @@ export default function SimuladorDashboard() {
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-blue-900">Tempo de Payback</h3>
                 </div>
-                <p className="text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-500 relative z-10">
+                <p className="text-4xl xl:text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-indigo-500 relative z-10">
                   {paybackAnos}<span className="text-2xl"> {paybackAnos === 1 ? 'ano' : 'anos'}</span> {paybackMesesRestantes > 0 && <span className="text-2xl">e {paybackMesesRestantes} {paybackMesesRestantes === 1 ? 'mês' : 'meses'}</span>}
                 </p>
                 <div className="mt-4 inline-flex items-center gap-1.5 bg-white/60 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-700 w-fit relative z-10">
@@ -188,25 +195,25 @@ export default function SimuladorDashboard() {
             <Card className="col-span-1 md:col-span-2 border-white/60 bg-white/70 backdrop-blur-xl shadow-xl shadow-indigo-900/5 rounded-2xl transition-all duration-300 hover:shadow-2xl">
               <CardContent className="p-8 flex flex-col lg:flex-row items-center justify-between gap-8">
                 
-                {/* Texto da Esquerda (Ligeiramente mais largo agora) */}
-                <div className="w-full lg:w-[40%] xl:w-1/3">
+                {/* Texto da Esquerda (Mais largo e com whitespace-nowrap) */}
+                <div className="w-full lg:w-[45%] xl:w-[40%]">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 shadow-sm">
                       <TrendingUp size={24} strokeWidth={2.5} />
                     </div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-indigo-900">Lucro (20 Anos)</h3>
                   </div>
-                  {/* Fonte reduzida para text-4xl e com tracking-tighter e break-words para valores muito altos */}
-                  <p className="text-4xl xl:text-5xl font-black tracking-tighter break-words bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-purple-600">
+                  {/* Removido o break-words, adicionado whitespace-nowrap e fonte ajustada */}
+                  <p className="text-4xl lg:text-[2.5rem] font-black tracking-tighter whitespace-nowrap bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-purple-600">
                     R$ {lucroLiquido20Anos.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-sm font-medium text-slate-500 mt-4 leading-relaxed">
+                  <p className="text-sm font-medium text-slate-500 mt-4 leading-relaxed pr-4">
                     Economia total acumulada ao longo da vida útil do sistema, já subtraindo o custo inicial do equipamento.
                   </p>
                 </div>
                 
-                {/* Gráfico de Barras Dinâmico (Proporção ajustada para acomodar o texto maior) */}
-                <div className="w-full lg:w-[55%] xl:w-2/3 h-48 bg-slate-50/50 rounded-xl border border-slate-100 p-4 flex flex-col justify-end relative">
+                {/* Gráfico de Barras Dinâmico */}
+                <div className="w-full lg:w-[50%] xl:w-[55%] h-48 bg-slate-50/50 rounded-xl border border-slate-100 p-4 flex flex-col justify-end relative">
                   <div className="absolute top-4 left-4 text-xs font-bold text-slate-400 flex items-center gap-1">
                     <BarChart3 size={14} /> Projeção de Acúmulo
                   </div>
@@ -247,8 +254,8 @@ export default function SimuladorDashboard() {
               </CardContent>
             </Card>
 
-          </div> {/* Fim do Painel de Resultados */}
-        </div> {/* Fim do Grid Principal */}
+          </div> 
+        </div> 
       </div> 
     </main>
   );

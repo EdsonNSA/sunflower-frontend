@@ -32,7 +32,7 @@ export default function SunflowerDashboard() {
     updateDateTime();
     const interval = setInterval(updateDateTime, 1000);
     return () => clearInterval(interval);
-  }, []); [cite: 6-7]
+  }, []);
 
   const fatores = [
     { 
@@ -65,7 +65,7 @@ export default function SunflowerDashboard() {
       color: "text-indigo-600", bgColor: "bg-indigo-100/50", borderColor: "border-indigo-200", 
       barBg: "bg-indigo-100", barFill: "bg-indigo-600", width: "w-[85%]" 
     },
-  ]; [cite: 7-9]
+  ];
 
   return (
     <main className="w-full p-4 md:p-6 lg:p-8 space-y-5 bg-[#eeede8] min-h-screen text-sun-text font-sans">
@@ -98,7 +98,7 @@ export default function SunflowerDashboard() {
             <span className="text-[11px] font-black text-sun-text/80 tracking-wide uppercase">{currentDateTime || "Sincronizando..."}</span>
           </div>
         </div>
-      </header> [cite: 10-14]
+      </header>
 
       {/* ── Location Bar ── */}
       <div className="flex items-center gap-2 bg-white px-4 py-3.5 rounded-lg border border-black/10 shadow-sm">
@@ -111,7 +111,7 @@ export default function SunflowerDashboard() {
         <span className="ml-auto bg-green-100 text-[#15803d] px-4 py-1.5 rounded-full font-black text-[11px] uppercase tracking-wider border border-green-200">
           Semiárido nordestino
         </span>
-      </div> [cite: 14-15]
+      </div>
 
       {/* ── Verdict Card ── */}
       <Card className="border-black/10 shadow-md rounded-xl overflow-hidden bg-white">
@@ -133,7 +133,7 @@ export default function SunflowerDashboard() {
             </div>
           </div>
         </CardContent>
-      </Card> [cite: 15-20]
+      </Card>
 
       {/* ── KPI Grid ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -150,7 +150,7 @@ export default function SunflowerDashboard() {
             <p className="text-[11px] font-bold text-[#15803d] bg-green-100/50 self-start px-2 py-0.5 rounded-md border border-green-200/50">{kpi.delta}</p>
           </div>
         ))}
-      </div> [cite: 20-22]
+      </div>
 
       {/* ── Main Charts Grid (Seção de Auditoria Técnica) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.6fr] gap-5">
@@ -172,7 +172,7 @@ export default function SunflowerDashboard() {
 
         {/* Novo Painel de Auditoria Angular ocupando o lugar da bússola */}
         <AngularPerformancePanel />
-      </div> [cite: 23-26]
+      </div>
 
       {/* ── Fatores de Viabilidade ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -188,7 +188,7 @@ export default function SunflowerDashboard() {
             </div>
           </div>
         ))}
-      </div> [cite: 27-29]
+      </div>
 
       {/* ── Curva de Irradiação ── */}
       <Card className="border-black/5 shadow-sm rounded-xl bg-white">
@@ -199,7 +199,7 @@ export default function SunflowerDashboard() {
           </div>
           <DayCurveChart />
         </CardContent>
-      </Card> [cite: 29-30]
+      </Card>
 
     </main>
   );

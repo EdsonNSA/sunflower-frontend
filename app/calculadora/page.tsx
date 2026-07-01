@@ -4,16 +4,15 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
-  Settings, Search, ChevronDown, ChevronUp, Play, Save,
-  MapPin, Download, Bookmark, ExternalLink, Shield,
-  HelpCircle, Zap, Calculator, LayoutDashboard, Crosshair,
+  Settings, Search, ChevronDown, ChevronUp, Play,
+  MapPin, Download, Shield,
+  HelpCircle, Calculator, LayoutDashboard, Crosshair,
   Globe, TableProperties, FileText, Clock, MoreHorizontal
 } from "lucide-react";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
-const PVWATTS_API_KEY = "E17ff3qCxPwvb9b4zmVpJXaczB1upKRPHSWEaiZR";
-const PVWATTS_API_URL = "https://developer.nrel.gov/api/pvwatts/v8.json";
+const PVWATTS_API_URL = "/api/pvwatts";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -134,7 +133,7 @@ const MapComponent = dynamic(
         >
           <TileLayer
             attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ©<a href="https://carto.com/">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           />
           <Marker position={center} />
           <ChangeView center={center} zoom={zoom} />
@@ -143,7 +142,7 @@ const MapComponent = dynamic(
       );
     };
   }),
-  { ssr: false, loading: () => <div className="h-full bg-[#0d1117] rounded-xl flex items-center justify-center text-gray-500">Carregando mapa...</div> }
+  { ssr: false, loading: () => <div className="h-full bg-[#eeede8] rounded-xl flex items-center justify-center text-[#6b6a64]">Carregando mapa...</div> }
 );
 
 // ─── Tooltip Component ───────────────────────────────────────────────────────
@@ -154,7 +153,7 @@ function Tooltip({ text }: { text: string }) {
     <span className="relative inline-flex ml-1.5">
       <button
         type="button"
-        className="text-purple-400 hover:text-purple-300 transition-colors"
+        className="text-sun-green-600 hover:text-sun-green-400 transition-colors"
         onMouseEnter={() => setShow(true)}
         onMouseLeave={() => setShow(false)}
         onClick={(e) => { e.preventDefault(); setShow(!show); }}
@@ -162,9 +161,9 @@ function Tooltip({ text }: { text: string }) {
         <HelpCircle size={14} />
       </button>
       {show && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-gray-200 text-xs rounded-lg shadow-xl border border-gray-700 w-64 z-50 whitespace-normal">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-white text-sun-text text-xs rounded-lg shadow-xl border border-black/10 w-64 z-50 whitespace-normal">
           {text}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800" />
+          <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-white" />
         </div>
       )}
     </span>
@@ -173,7 +172,7 @@ function Tooltip({ text }: { text: string }) {
 
 // ─── NavLink (Padrão Ouro) ───────────────────────────────────────────────────
 
-function NavLink({ href, icon: Icon, label, active = false, isMobileHidden = false }: { href: string; icon: any; label: string; active?: boolean; isMobileHidden?: boolean }) {
+function NavLink({ href, icon: Icon, label, active = false, isMobileHidden = false }: { href: string; icon: React.ElementType; label: string; active?: boolean; isMobileHidden?: boolean }) {
   return (
     <Link href={href} className={`
       flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 group flex-1 md:flex-initial
@@ -192,7 +191,6 @@ function NavLink({ href, icon: Icon, label, active = false, isMobileHidden = fal
 
 export default function CalculadoraPage() {
   // ── State ─────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"novo" | "salvos" | "clientes">("novo");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [loading, setLoading] = useState(false);
   const [apiOnline, setApiOnline] = useState(true);
@@ -240,7 +238,7 @@ export default function CalculadoraPage() {
   }, []);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const updateForm = useCallback((key: keyof FormData, value: any) => {
+  const updateForm = useCallback((key: keyof FormData, value: FormData[keyof FormData]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
@@ -253,6 +251,20 @@ export default function CalculadoraPage() {
   }, []);
 
   // ── Geocoding ─────────────────────────────────────────────────────────────
+  const reverseGeocode = useCallback(async (lat: number, lon: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+      );
+      const data = await res.json();
+      if (data && data.display_name) {
+        setReverseAddress(data.display_name);
+      }
+    } catch {
+      // silêncio
+    }
+  }, []);
+
   const geocodeAddress = useCallback(async () => {
     if (!form.address.trim()) return;
 
@@ -286,21 +298,7 @@ export default function CalculadoraPage() {
     } catch {
       setError("Erro ao buscar endereço. Verifique sua conexão.");
     }
-  }, [form.address, updateForm]);
-
-  const reverseGeocode = useCallback(async (lat: number, lon: number) => {
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
-      );
-      const data = await res.json();
-      if (data && data.display_name) {
-        setReverseAddress(data.display_name);
-      }
-    } catch {
-      // silêncio
-    }
-  }, []);
+  }, [form.address, updateForm, reverseGeocode]);
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     updateForm("lat", lat.toFixed(6));
@@ -310,13 +308,8 @@ export default function CalculadoraPage() {
   }, [updateForm, reverseGeocode]);
 
   // ── Chamada API PVWatts ───────────────────────────────────────────────────
-  const calculate = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-
+  const callPVWatts = useCallback(async (dataset: string): Promise<PVWattsResponse> => {
     const params = new URLSearchParams({
-      api_key: PVWATTS_API_KEY,
       lat: form.lat,
       lon: form.lon,
       system_capacity: form.system_capacity,
@@ -329,7 +322,7 @@ export default function CalculadoraPage() {
       inv_eff: form.inv_eff,
       gcr: form.gcr,
       timeframe: "monthly",
-      dataset: "nsrdb",
+      dataset,
     });
 
     if (form.albedo.trim()) params.set("albedo", form.albedo.trim());
@@ -340,30 +333,80 @@ export default function CalculadoraPage() {
       params.set("soiling", soilingValues.join("|"));
     }
 
+    const res = await fetch(`${PVWATTS_API_URL}?${params.toString()}`);
+
+    // Verificar status HTTP antes de parsear
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const errBody = await res.json();
+        // API NREL retorna { error: { code, message } } para erros de autenticação/rate-limit
+        if (errBody?.error?.message) detail = errBody.error.message;
+        else if (errBody?.errors?.length) detail = errBody.errors.join(", ");
+      } catch { /* corpo não-JSON, usar status HTTP */ }
+      throw new Error(detail);
+    }
+
+    const data = await res.json();
+
+    // Verificar erros retornados no corpo da resposta (formato PVWatts)
+    if (data.errors && data.errors.length > 0) {
+      throw new Error(data.errors.join(", "));
+    }
+
+    // Verificar formato de erro singular (formato NREL genérico)
+    if (data.error) {
+      throw new Error(data.error.message || data.error.code || "Erro desconhecido da API");
+    }
+
+    // Verificar se outputs existe na resposta
+    if (!data.outputs) {
+      throw new Error("A API não retornou dados de produção para esta localização.");
+    }
+
+    return data as PVWattsResponse;
+  }, [form]);
+
+  const calculate = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
     try {
-      const res = await fetch(`${PVWATTS_API_URL}?${params.toString()}`);
-      const data: PVWattsResponse = await res.json();
-
-      if (data.errors && data.errors.length > 0) {
-        setError(`Erro da API PVWatts: ${data.errors.join(", ")}`);
-        setLoading(false);
-        return;
-      }
-
+      // Tentar com dataset NSRDB (cobre Américas)
+      const data = await callPVWatts("nsrdb");
       setResult(data);
       setApiOnline(true);
 
       setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 200);
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Verifique sua conexão";
-      setError(`Falha ao conectar com a API PVWatts: ${message}`);
+    } catch (firstError: unknown) {
+      // Se NSRDB falhar por falta de dados solares, tentar dataset internacional
+      const firstMsg = firstError instanceof Error ? firstError.message : "";
+      const isMissingData = firstMsg.toLowerCase().includes("no solar") ||
+        firstMsg.toLowerCase().includes("no data") ||
+        firstMsg.toLowerCase().includes("not found");
+
+      if (isMissingData) {
+        try {
+          const data = await callPVWatts("intl");
+          setResult(data);
+          setApiOnline(true);
+          setTimeout(() => {
+            resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 200);
+          return;
+        } catch { /* fallback também falhou, reportar erro original */ }
+      }
+
+      const message = firstError instanceof Error ? firstError.message : "Verifique sua conexão.";
+      setError(`Erro da API PVWatts: ${message}`);
       setApiOnline(false);
     } finally {
       setLoading(false);
     }
-  }, [form]);
+  }, [callPVWatts]);
 
   // ── Encontrar Instalador ──────────────────────────────────────────────────
   const findInstaller = useCallback(() => {
@@ -516,12 +559,12 @@ export default function CalculadoraPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <main className="w-full bg-[#eeede8] min-h-screen font-sans pb-0 overflow-x-hidden flex flex-col">
-      
+
       {/* ── NAVBAR RESPONSIVA (Z-INDEX 50) ── */}
       <div className="relative z-50 p-3 sm:p-4 md:p-6 lg:p-8 pb-4 sm:pb-6 bg-[#eeede8]">
         <nav className="w-full">
           <div className="max-w-full mx-auto bg-white/90 backdrop-blur-md border border-white shadow-xl rounded-3xl p-2 md:p-3 flex flex-col xl:flex-row justify-between gap-3">
-            
+
             {/* LINHA 1 (Mobile) / Lado Esquerdo (Desktop) */}
             <div className="flex items-center justify-between w-full xl:w-auto px-2 md:px-4 md:border-r border-black/5">
               <div className="flex items-center gap-3 md:gap-4">
@@ -533,7 +576,7 @@ export default function CalculadoraPage() {
                   <p className="text-[8px] sm:text-[9px] font-bold text-sun-green-600 tracking-widest uppercase">PVWatts API v8</p>
                 </div>
               </div>
-              
+
               <Link href="/relatorio" target="_blank" className="flex xl:hidden items-center gap-1.5 bg-[#1a1a1a] text-white px-3 py-2 rounded-xl shadow-md active:scale-95 transition-transform shrink-0">
                 <FileText size={14} className="text-sun-amber-400" />
                 <span className="text-[9px] font-black uppercase tracking-widest">Dossiê</span>
@@ -542,26 +585,26 @@ export default function CalculadoraPage() {
 
             {/* LINHA 2 e 3 (Mobile) / Centro (Desktop) */}
             <div className="flex flex-col xl:flex-row w-full xl:w-auto flex-1 items-center justify-between xl:justify-start gap-2 px-1">
-              
+
               <div className="flex w-full xl:w-auto items-center bg-[#eeede8]/60 p-1.5 rounded-2xl gap-1 border border-black/5 justify-center md:justify-start relative">
                 <NavLink href="/" icon={LayoutDashboard} label="Painel" />
                 <NavLink href="/calculadora" icon={Calculator} label="Calc" active />
-                
+
                 <NavLink href="/rastreador" icon={Crosshair} label="Rastreio" isMobileHidden />
                 <NavLink href="/mapeador" icon={MapPin} label="Mapa" isMobileHidden />
                 <NavLink href="/regions" icon={Globe} label="Regiões" isMobileHidden />
                 <NavLink href="/simulador/economia" icon={TableProperties} label="ROI" isMobileHidden />
-                
+
                 {/* Dropdown Mobile ("Mais...") */}
                 <div className="relative md:hidden flex-1 flex justify-center">
-                  <button 
+                  <button
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl w-full transition-all duration-200 text-sun-text hover:bg-black/5 ${isMenuOpen ? 'bg-black/5' : ''}`}
                   >
                     <MoreHorizontal size={16} className="text-sun-green-600 shrink-0" />
                     <span className="text-[9px] font-black uppercase tracking-wider">Mais</span>
                   </button>
-                  
+
                   {isMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
@@ -598,7 +641,7 @@ export default function CalculadoraPage() {
                 <FileText size={16} className="text-sun-amber-400 group-hover:rotate-6 transition-transform" />
                 <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Dossiê PDF</span>
               </Link>
-              
+
               <div className="flex items-center gap-4 px-4 py-2.5 bg-white border border-black/5 rounded-2xl shadow-inner shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -615,532 +658,482 @@ export default function CalculadoraPage() {
         </nav>
       </div>
 
-      {/* ── CONTEÚDO DARK (Z-INDEX 10 PARA FICAR ATRÁS DO MENU) ── */}
-      <div className="relative z-10 bg-[#0f1419] flex-1 rounded-t-3xl border-t border-gray-800">
+      {/* ── CONTEÚDO (TEMA CLARO) ── */}
+      <div className="relative z-10 flex-1">
         <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-8 space-y-6">
 
           {/* ── Header ── */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-linear-to-br from-green-500 to-green-700 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
+              <div className="w-12 h-12 bg-sun-green-600 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
                 <Settings size={26} className="text-white" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Calculadora PVWatts</h1>
-                <p className="text-[10px] sm:text-xs text-gray-400 font-medium">Produção fotovoltaica real via NREL PVWatts API v8</p>
+                <h1 className="text-xl sm:text-2xl font-black text-sun-text tracking-tight">Calculadora PVWatts</h1>
+                <p className="text-[10px] sm:text-xs text-[#6b6a64] font-medium">Produção fotovoltaica real via NREL PVWatts API v8</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 bg-[#1a1f2e] border border-gray-700 rounded-xl text-gray-300 text-xs font-bold uppercase tracking-wider hover:bg-[#252b3b] transition-colors">
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-black/10 rounded-xl text-sun-text text-xs font-bold uppercase tracking-wider hover:bg-[#eeede8] transition-colors shadow-sm">
                 <Shield size={14} />
                 Admin
               </button>
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border ${apiOnline ? "bg-green-500/10 border-green-500/30 text-green-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
-                <div className={`w-2 h-2 rounded-full ${apiOnline ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border ${apiOnline ? "bg-green-50 border-green-200 text-sun-green-600" : "bg-red-50 border-red-200 text-red-600"}`}>
+                <div className={`w-2 h-2 rounded-full ${apiOnline ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
                 API NREL • {apiOnline ? "ONLINE" : "OFFLINE"}
               </div>
             </div>
           </div>
 
-          {/* ── Tabs (Com scroll no mobile) ── */}
-          <div className="flex items-center gap-1 border-b border-gray-800 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] scrollbar-none">
-            <button
-              onClick={() => setActiveTab("novo")}
-              className={`flex items-center gap-2 px-5 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${activeTab === "novo" ? "border-green-400 text-green-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
-            >
-              <Settings size={14} />
-              Novo Cálculo
-            </button>
-            <button
-              onClick={() => setActiveTab("salvos")}
-              className={`flex items-center gap-2 px-5 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${activeTab === "salvos" ? "border-green-400 text-green-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
-            >
-              <Bookmark size={14} />
-              Cálculos Salvos
-              <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full text-[10px] font-black ml-1">2</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("clientes")}
-              className={`flex items-center gap-2 px-5 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${activeTab === "clientes" ? "border-green-400 text-green-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
-            >
-              <ExternalLink size={14} />
-              Clientes Ativos
-              <span className="bg-gray-700 text-gray-400 px-2 py-0.5 rounded-full text-[10px] font-black ml-1">0</span>
-            </button>
-          </div>
+          {/* ── Conteúdo do Cálculo ── */}
+          <div className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-5 py-3 rounded-xl text-sm font-bold">
+                ⚠️ {error}
+              </div>
+            )}
 
-          {/* ── Tab Content: Novo Cálculo ── */}
-          {activeTab === "novo" && (
-            <div className="space-y-6">
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-5 py-3 rounded-xl text-sm font-bold">
-                  ⚠️ {error}
+            {/* ── LOCALIZAÇÃO ── */}
+            <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 space-y-4 shadow-sm">
+              <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-sun-text">Localização do Sistema</h2>
+
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                <div className="flex-1">
+                  <input
+                    id="calc-address"
+                    type="text"
+                    placeholder="Endereço ou coordenadas (lat, lon)"
+                    value={form.address}
+                    onChange={(e) => updateForm("address", e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && geocodeAddress()}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm placeholder:text-[#6b6a64]/50 focus:outline-none focus:border-sun-green-600 transition-colors"
+                  />
+                  <p className="text-[10px] sm:text-[11px] text-[#6b6a64]/70 mt-1.5">Digite um endereço, cidade ou coordenadas (lat, lon)</p>
+                </div>
+                <button
+                  onClick={geocodeAddress}
+                  className="flex items-center justify-center gap-2 px-5 py-3 bg-white border border-black/10 rounded-xl text-sun-text text-sm font-bold hover:border-sun-green-600 transition-colors shrink-0 w-full sm:w-auto shadow-sm"
+                >
+                  <Search size={16} />
+                  Localizar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 block">Latitude</label>
+                  <input
+                    id="calc-lat"
+                    type="text"
+                    value={form.lat}
+                    onChange={(e) => {
+                      updateForm("lat", e.target.value);
+                      const lat = parseFloat(e.target.value);
+                      const lon = parseFloat(form.lon);
+                      if (!isNaN(lat) && !isNaN(lon)) setMapCenter([lat, lon]);
+                    }}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:outline-none focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 block">Longitude</label>
+                  <input
+                    id="calc-lon"
+                    type="text"
+                    value={form.lon}
+                    onChange={(e) => {
+                      updateForm("lon", e.target.value);
+                      const lat = parseFloat(form.lat);
+                      const lon = parseFloat(e.target.value);
+                      if (!isNaN(lat) && !isNaN(lon)) setMapCenter([lat, lon]);
+                    }}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:outline-none focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Mapa isolado com z-index baixo para não sobrepor o dropdown */}
+              <div className="h-75 sm:h-100 rounded-xl overflow-hidden border border-black/10 relative z-0">
+                <MapComponent center={mapCenter} zoom={mapZoom} onMapClick={handleMapClick} />
+              </div>
+
+              {reverseAddress && (
+                <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-[#6b6a64]">
+                  <MapPin size={14} className="text-red-500" />
+                  <span>{reverseAddress}</span>
+                  <span className="text-black/10 hidden sm:inline">•</span>
+                  <span className="text-sun-green-600 font-bold">Lat: {form.lat} · Lon: {form.lon}</span>
                 </div>
               )}
+            </div>
 
-              {/* ── LOCALIZAÇÃO ── */}
-              <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-5 sm:p-6 space-y-4">
-                <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-gray-400">Localização do Sistema</h2>
+            {/* ── INFORMAÇÕES DO SISTEMA ── */}
+            <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 space-y-5 shadow-sm">
+              <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-sun-text">Informações do Sistema</h2>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="flex-1">
-                    <input
-                      id="calc-address"
-                      type="text"
-                      placeholder="Endereço ou coordenadas (lat, lon)"
-                      value={form.address}
-                      onChange={(e) => updateForm("address", e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && geocodeAddress()}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder:text-gray-600 focus:outline-none focus:border-green-500 transition-colors"
-                    />
-                    <p className="text-[10px] sm:text-[11px] text-gray-600 mt-1.5">Digite um endereço, cidade ou coordenadas (lat, lon)</p>
-                  </div>
-                  <button
-                    onClick={geocodeAddress}
-                    className="flex items-center justify-center gap-2 px-5 py-3 bg-[#0f1419] border border-gray-700 rounded-xl text-white text-sm font-bold hover:border-green-500 transition-colors shrink-0 w-full sm:w-auto"
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Label / Nome <Tooltip text="Nome de identificação do cálculo para referência futura." />
+                  </label>
+                  <input
+                    id="calc-label"
+                    type="text"
+                    placeholder="Ex: Residência"
+                    value={form.label}
+                    onChange={(e) => updateForm("label", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Tamanho CC (kWp) <Tooltip text="Capacidade nominal do sistema fotovoltaico em kW. Faixa: 0.05 a 500000." />
+                  </label>
+                  <input
+                    id="calc-capacity"
+                    type="number"
+                    step="0.1"
+                    min="0.05"
+                    max="500000"
+                    value={form.system_capacity}
+                    onChange={(e) => updateForm("system_capacity", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Tipo de Módulo <Tooltip text="0=Padrão, 1=Premium, 2=Filme fino." />
+                  </label>
+                  <select
+                    id="calc-module-type"
+                    value={form.module_type}
+                    onChange={(e) => updateForm("module_type", parseInt(e.target.value))}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors appearance-none cursor-pointer"
                   >
-                    <Search size={16} />
-                    Localizar
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Latitude</label>
-                    <input
-                      id="calc-lat"
-                      type="text"
-                      value={form.lat}
-                      onChange={(e) => {
-                        updateForm("lat", e.target.value);
-                        const lat = parseFloat(e.target.value);
-                        const lon = parseFloat(form.lon);
-                        if (!isNaN(lat) && !isNaN(lon)) setMapCenter([lat, lon]);
-                      }}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 block">Longitude</label>
-                    <input
-                      id="calc-lon"
-                      type="text"
-                      value={form.lon}
-                      onChange={(e) => {
-                        updateForm("lon", e.target.value);
-                        const lat = parseFloat(form.lat);
-                        const lon = parseFloat(e.target.value);
-                        if (!isNaN(lat) && !isNaN(lon)) setMapCenter([lat, lon]);
-                      }}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Mapa isolado com z-index baixo para não sobrepor o dropdown */}
-                <div className="h-75 sm:h-100 rounded-xl overflow-hidden border border-gray-700 relative z-0">
-                  <MapComponent center={mapCenter} zoom={mapZoom} onMapClick={handleMapClick} />
-                </div>
-
-                {reverseAddress && (
-                  <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-xs text-gray-500">
-                    <MapPin size={14} className="text-red-400" />
-                    <span>{reverseAddress}</span>
-                    <span className="text-gray-700 hidden sm:inline">•</span>
-                    <span className="text-green-400 font-bold">Lat: {form.lat} · Lon: {form.lon}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* ── INFORMAÇÕES DO SISTEMA ── */}
-              <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-5 sm:p-6 space-y-5">
-                <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-gray-400">Informações do Sistema</h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Label / Nome <Tooltip text="Nome de identificação do cálculo para referência futura." />
-                    </label>
-                    <input
-                      id="calc-label"
-                      type="text"
-                      placeholder="Ex: Residência"
-                      value={form.label}
-                      onChange={(e) => updateForm("label", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Tamanho CC (kWp) <Tooltip text="Capacidade nominal do sistema fotovoltaico em kW. Faixa: 0.05 a 500000." />
-                    </label>
-                    <input
-                      id="calc-capacity"
-                      type="number"
-                      step="0.1"
-                      min="0.05"
-                      max="500000"
-                      value={form.system_capacity}
-                      onChange={(e) => updateForm("system_capacity", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Tipo de Módulo <Tooltip text="0=Padrão, 1=Premium, 2=Filme fino." />
-                    </label>
-                    <select
-                      id="calc-module-type"
-                      value={form.module_type}
-                      onChange={(e) => updateForm("module_type", parseInt(e.target.value))}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors appearance-none cursor-pointer"
-                    >
-                      {MODULE_TYPES.map((m) => (<option key={m.value} value={m.value}>{m.label}</option>))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Tipo de Arranjo <Tooltip text="Tipo de montagem: 0=Fixo rack aberto, 1=Fixo teto, 2=1-eixo, 3=1-eixo backtracking, 4=2-eixos." />
-                    </label>
-                    <select
-                      id="calc-array-type"
-                      value={form.array_type}
-                      onChange={(e) => updateForm("array_type", parseInt(e.target.value))}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors appearance-none cursor-pointer"
-                    >
-                      {ARRAY_TYPES.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Perdas (%) <Tooltip text="Perdas totais do sistema em percentual. Faixa: -5 a 99." />
-                    </label>
-                    <input
-                      id="calc-losses"
-                      type="number"
-                      step="0.01"
-                      min="-5"
-                      max="99"
-                      value={form.losses}
-                      onChange={(e) => updateForm("losses", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Inclinação (°) <Tooltip text="Ângulo de inclinação do painel em graus. Faixa: 0 a 90." />
-                    </label>
-                    <input
-                      id="calc-tilt"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="90"
-                      value={form.tilt}
-                      onChange={(e) => updateForm("tilt", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Azimute (°) <Tooltip text="Ângulo azimutal do painel em graus. 180°=Sul (hemisfério norte). Faixa: 0 a 359." />
-                    </label>
-                    <input
-                      id="calc-azimuth"
-                      type="number"
-                      step="1"
-                      min="0"
-                      max="359"
-                      value={form.azimuth}
-                      onChange={(e) => updateForm("azimuth", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Rel. CC para CA <Tooltip text="Razão de potência CC para CA (DC to AC ratio). Valor padrão: 1.2. Deve ser positivo." />
-                    </label>
-                    <input
-                      id="calc-dc-ac"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={form.dc_ac_ratio}
-                      onChange={(e) => updateForm("dc_ac_ratio", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                      Efic. Inversor (%) <Tooltip text="Eficiência do inversor na potência nominal. Faixa: 90 a 99.5. Padrão: 96." />
-                    </label>
-                    <input
-                      id="calc-inv-eff"
-                      type="number"
-                      step="0.1"
-                      min="90"
-                      max="99.5"
-                      value={form.inv_eff}
-                      onChange={(e) => updateForm("inv_eff", e.target.value)}
-                      className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                    />
-                  </div>
+                    {MODULE_TYPES.map((m) => (<option key={m.value} value={m.value}>{m.label}</option>))}
+                  </select>
                 </div>
               </div>
 
-              {/* ── PARÂMETROS AVANÇADOS ── */}
-              <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 overflow-hidden">
-                <button
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="w-full flex items-center justify-between px-5 sm:px-6 py-4 hover:bg-[#252b3b] transition-colors"
-                >
-                  <span className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-gray-400">
-                    <Settings size={14} className="text-purple-400" />
-                    Parâmetros Avançados
-                  </span>
-                  {showAdvanced ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Tipo de Arranjo <Tooltip text="Tipo de montagem: 0=Fixo rack aberto, 1=Fixo teto, 2=1-eixo, 3=1-eixo backtracking, 4=2-eixos." />
+                  </label>
+                  <select
+                    id="calc-array-type"
+                    value={form.array_type}
+                    onChange={(e) => updateForm("array_type", parseInt(e.target.value))}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors appearance-none cursor-pointer"
+                  >
+                    {ARRAY_TYPES.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Perdas (%) <Tooltip text="Perdas totais do sistema em percentual. Faixa: -5 a 99." />
+                  </label>
+                  <input
+                    id="calc-losses"
+                    type="number"
+                    step="0.01"
+                    min="-5"
+                    max="99"
+                    value={form.losses}
+                    onChange={(e) => updateForm("losses", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Inclinação (°) <Tooltip text="Ângulo de inclinação do painel em graus. Faixa: 0 a 90." />
+                  </label>
+                  <input
+                    id="calc-tilt"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="90"
+                    value={form.tilt}
+                    onChange={(e) => updateForm("tilt", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+              </div>
 
-                {showAdvanced && (
-                  <div className="px-5 sm:px-6 pb-6 space-y-5 border-t border-gray-800 pt-5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                          GCR <Tooltip text="Ground Coverage Ratio — razão da área do módulo pela área total do solo. Faixa: 0.01 a 0.99. Padrão: 0.4." />
-                        </label>
-                        <input
-                          id="calc-gcr"
-                          type="number"
-                          step="0.01"
-                          min="0.01"
-                          max="0.99"
-                          value={form.gcr}
-                          onChange={(e) => updateForm("gcr", e.target.value)}
-                          className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                          Albedo <Tooltip text="Refletância do solo. Valor entre 0 e 1. Deixe vazio para usar o valor do arquivo meteorológico (recomendado)." />
-                        </label>
-                        <input
-                          id="calc-albedo"
-                          type="text"
-                          placeholder="Do arquivo"
-                          value={form.albedo}
-                          onChange={(e) => updateForm("albedo", e.target.value)}
-                          className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder:text-gray-600 focus:border-green-500 transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                          Bifacial <Tooltip text="Ativa módulo bifacial." />
-                        </label>
-                        <select
-                          id="calc-bifacial"
-                          value={form.bifacial}
-                          onChange={(e) => updateForm("bifacial", e.target.value)}
-                          className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors appearance-none cursor-pointer"
-                        >
-                          <option value="0">Não</option>
-                          <option value="1">Sim</option>
-                        </select>
-                      </div>
-                    </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Azimute (°) <Tooltip text="Ângulo azimutal do painel em graus. 180°=Sul (hemisfério norte). Faixa: 0 a 359." />
+                  </label>
+                  <input
+                    id="calc-azimuth"
+                    type="number"
+                    step="1"
+                    min="0"
+                    max="359"
+                    value={form.azimuth}
+                    onChange={(e) => updateForm("azimuth", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Rel. CC para CA <Tooltip text="Razão de potência CC para CA (DC to AC ratio). Valor padrão: 1.2. Deve ser positivo." />
+                  </label>
+                  <input
+                    id="calc-dc-ac"
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={form.dc_ac_ratio}
+                    onChange={(e) => updateForm("dc_ac_ratio", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                    Efic. Inversor (%) <Tooltip text="Eficiência do inversor na potência nominal. Faixa: 90 a 99.5. Padrão: 96." />
+                  </label>
+                  <input
+                    id="calc-inv-eff"
+                    type="number"
+                    step="0.1"
+                    min="90"
+                    max="99.5"
+                    value={form.inv_eff}
+                    onChange={(e) => updateForm("inv_eff", e.target.value)}
+                    className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
 
-                    {form.bifacial === "1" && (
-                      <div className="max-w-xs">
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 flex items-center">
-                          Bifacialidade (0-1)
-                        </label>
-                        <input
-                          id="calc-bifaciality"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          max="1"
-                          value={form.bifaciality}
-                          onChange={(e) => updateForm("bifaciality", e.target.value)}
-                          className="w-full bg-[#0f1419] border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-green-500 transition-colors"
-                        />
-                      </div>
-                    )}
+            {/* ── PARÂMETROS AVANÇADOS ── */}
+            <div className="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-sm">
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full flex items-center justify-between px-5 sm:px-6 py-4 hover:bg-black/5 transition-colors"
+              >
+                <span className="flex items-center gap-2 text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-[#6b6a64]">
+                  <Settings size={14} className="text-sun-green-600" />
+                  Parâmetros Avançados
+                </span>
+                {showAdvanced ? <ChevronUp size={18} className="text-[#6b6a64]" /> : <ChevronDown size={18} className="text-[#6b6a64]" />}
+              </button>
 
+              {showAdvanced && (
+                <div className="px-5 sm:px-6 pb-6 space-y-5 border-t border-black/5 pt-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center">
-                        Perda Mensal — Soiling (%) <Tooltip text="Redução na irradiância solar causada por sujeira (0 a 100%)." />
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                        GCR <Tooltip text="Ground Coverage Ratio — razão da área do módulo pela área total do solo. Faixa: 0.01 a 0.99. Padrão: 0.4." />
                       </label>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                        {MONTH_NAMES_SHORT.map((month, i) => (
-                          <div key={month}>
-                            <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1 block">{month}</label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="100"
-                              value={form.soiling[i]}
-                              onChange={(e) => updateSoiling(i, e.target.value)}
-                              className="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-2 sm:px-3 py-2 text-white text-xs sm:text-sm text-center focus:border-green-500 transition-colors"
-                            />
-                          </div>
-                        ))}
-                      </div>
+                      <input
+                        id="calc-gcr"
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        max="0.99"
+                        value={form.gcr}
+                        onChange={(e) => updateForm("gcr", e.target.value)}
+                        className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                      />
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── BOTÕES DE AÇÃO ── */}
-              <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-                <button
-                  onClick={calculate}
-                  disabled={loading}
-                  className="w-full sm:w-auto flex justify-center items-center gap-2 px-6 py-3 bg-[#a3e635] hover:bg-[#bef264] text-[#0f1419] rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all hover:-translate-y-0.5 shadow-lg shadow-[#a3e635]/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Play size={16} fill="currentColor" />
-                  {loading ? "Calculando..." : "Calcular PVWatts"}
-                </button>
-                <button
-                  onClick={calculate}
-                  disabled={loading}
-                  className="w-full sm:w-auto flex justify-center items-center gap-2 px-6 py-3 bg-[#1a1f2e] hover:bg-[#252b3b] text-white border border-gray-700 rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Save size={16} />
-                  Calcular e Salvar
-                </button>
-              </div>
-
-              {/* ── RESULTADOS ── */}
-              {result && result.outputs && (
-                <div ref={resultRef} className="space-y-6 animate-in fade-in duration-500">
-                  <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-5 sm:p-6">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
-                      <div>
-                        <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-green-400 mb-2">Resultados</h2>
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-4xl sm:text-5xl font-black text-white">{Math.round(result.outputs.ac_annual).toLocaleString("pt-BR")}</span>
-                          <span className="text-sm sm:text-lg text-gray-400 font-bold">kWh/Ano</span>
-                        </div>
-                        <p className="text-[10px] sm:text-xs text-gray-500 mt-1">* Baseado em dados TMY — pode variar do desempenho real</p>
-                        <p className="text-[11px] sm:text-sm text-gray-400 mt-1">
-                          Estação NREL: {result.station_info.city ? result.station_info.city + ", " : ""}{result.station_info.state}
-                        </p>
-                      </div>
-                      <button
-                        onClick={findInstaller}
-                        className="flex justify-center items-center gap-2 px-5 py-2.5 bg-[#0f1419] border border-gray-700 rounded-xl text-white text-xs sm:text-sm font-bold hover:border-green-500 transition-colors w-full md:w-auto shrink-0"
+                    <div>
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                        Albedo <Tooltip text="Refletância do solo. Valor entre 0 e 1. Deixe vazio para usar o valor do arquivo meteorológico (recomendado)." />
+                      </label>
+                      <input
+                        id="calc-albedo"
+                        type="text"
+                        placeholder="Do arquivo"
+                        value={form.albedo}
+                        onChange={(e) => updateForm("albedo", e.target.value)}
+                        className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm placeholder:text-[#6b6a64]/50 focus:border-sun-green-600 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                        Bifacial <Tooltip text="Ativa módulo bifacial." />
+                      </label>
+                      <select
+                        id="calc-bifacial"
+                        value={form.bifacial}
+                        onChange={(e) => updateForm("bifacial", e.target.value)}
+                        className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors appearance-none cursor-pointer"
                       >
-                        <MapPin size={16} className="text-green-400" />
-                        Encontrar instalador local
-                      </button>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-100">
-                        <thead>
-                          <tr className="border-b border-gray-700">
-                            <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-2 sm:px-4">Mês</th>
-                            <th className="text-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-2 sm:px-4">
-                              Radiação Solar<br /><span className="font-normal text-gray-600">(kWh/m²/dia)</span>
-                            </th>
-                            <th className="text-right text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-500 py-3 px-2 sm:px-4">
-                              Energia CA<br /><span className="font-normal text-gray-600">(kWh)</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {MONTH_NAMES.map((name, i) => (
-                            <tr key={name} className="border-b border-gray-800/50 hover:bg-[#252b3b]/30 transition-colors">
-                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-white">{name}</td>
-                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-300 text-center">{result.outputs.solrad_monthly[i].toFixed(2)}</td>
-                              <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-green-400 text-right">{Math.round(result.outputs.ac_monthly[i]).toLocaleString("pt-BR")}</td>
-                            </tr>
-                          ))}
-                          <tr className="border-t-2 border-green-500/30 bg-green-500/5">
-                            <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-black text-green-400">Anual</td>
-                            <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-green-400 text-center">{result.outputs.solrad_annual.toFixed(2)}</td>
-                            <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-black text-green-400 text-right">{Math.round(result.outputs.ac_annual).toLocaleString("pt-BR")}</td>
-                          </tr>
-                        </tbody>
-                      </table>
+                        <option value="0">Não</option>
+                        <option value="1">Sim</option>
+                      </select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-                    <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-5 sm:p-6 space-y-4">
-                      <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-green-400">Identificação da Estação</h2>
-                      <div className="space-y-3 text-xs sm:text-sm">
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Localização</span>
-                          <span className="text-white font-bold text-right max-w-[60%] truncate">{reverseAddress || form.address || `${form.lat}, ${form.lon}`}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Estação NSRDB</span>
-                          <span className="text-white font-bold">{result.station_info.city ? result.station_info.city + ", " : ""}{result.station_info.state}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Lat NSRDB</span>
-                          <span className="text-white font-bold">{result.station_info.lat.toFixed(4)}°</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Lon NSRDB</span>
-                          <span className="text-white font-bold">{result.station_info.lon.toFixed(4)}°</span>
-                        </div>
-                      </div>
+                  {form.bifacial === "1" && (
+                    <div className="max-w-xs">
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-1.5 flex items-center">
+                        Bifacialidade (0-1)
+                      </label>
+                      <input
+                        id="calc-bifaciality"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        value={form.bifaciality}
+                        onChange={(e) => updateForm("bifaciality", e.target.value)}
+                        className="w-full bg-[#eeede8]/60 border border-black/10 rounded-xl px-4 py-3 text-sun-text text-sm focus:border-sun-green-600 transition-colors"
+                      />
                     </div>
+                  )}
 
-                    <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-5 sm:p-6 space-y-4">
-                      <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-green-400">Métricas Principais</h2>
-                      <div className="space-y-3 text-xs sm:text-sm">
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Fator de capacidade</span>
-                          <span className="text-white font-bold">{result.outputs.capacity_factor.toFixed(1)}%</span>
+                  <div>
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] mb-3 flex items-center">
+                      Perda Mensal — Soiling (%) <Tooltip text="Redução na irradiância solar causada por sujeira (0 a 100%)." />
+                    </label>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                      {MONTH_NAMES_SHORT.map((month, i) => (
+                        <div key={month}>
+                          <label className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#6b6a64]/70 mb-1 block">{month}</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={form.soiling[i]}
+                            onChange={(e) => updateSoiling(i, e.target.value)}
+                            className="w-full bg-[#eeede8]/60 border border-black/10 rounded-lg px-2 sm:px-3 py-2 text-sun-text text-xs sm:text-sm text-center focus:border-sun-green-600 transition-colors"
+                          />
                         </div>
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Tamanho do Sistema</span>
-                          <span className="text-white font-bold">{form.system_capacity} kWp</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-800/50 pb-2">
-                          <span className="text-gray-500">Perdas Configuradas</span>
-                          <span className="text-white font-bold">{form.losses}%</span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
 
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
+            {/* ── BOTÕES DE AÇÃO ── */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <button
+                onClick={calculate}
+                disabled={loading}
+                className="w-full sm:w-auto flex justify-center items-center gap-2 px-6 py-3 bg-sun-green-600 hover:bg-sun-green-400 text-white rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all hover:-translate-y-0.5 shadow-lg shadow-sun-green-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play size={16} fill="currentColor" />
+                {loading ? "Calculando..." : "Calcular PVWatts"}
+              </button>
+
+            </div>
+
+            {/* ── RESULTADOS ── */}
+            {result && result.outputs && (
+              <div ref={resultRef} className="space-y-6 animate-in fade-in duration-500">
+                <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 shadow-sm">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-sun-green-600 mb-2">Resultados</h2>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-4xl sm:text-5xl font-black text-sun-text">{Math.round(result.outputs.ac_annual).toLocaleString("pt-BR")}</span>
+                        <span className="text-sm sm:text-lg text-[#6b6a64] font-bold">kWh/Ano</span>
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-[#6b6a64] mt-1">* Baseado em dados TMY — pode variar do desempenho real</p>
+                      <p className="text-[11px] sm:text-sm text-[#4a4944] mt-1">
+                        Estação NREL: {result.station_info.city ? result.station_info.city + ", " : ""}{result.station_info.state}
+                      </p>
+                    </div>
                     <button
-                      onClick={generatePDF}
-                      className="w-full sm:w-auto flex justify-center items-center gap-2 px-6 py-3 bg-[#a3e635]/10 hover:bg-[#a3e635]/20 text-[#a3e635] border border-[#a3e635]/30 rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all hover:-translate-y-0.5"
+                      onClick={findInstaller}
+                      className="flex justify-center items-center gap-2 px-5 py-2.5 bg-white border border-black/10 rounded-xl text-sun-text text-xs sm:text-sm font-bold hover:border-sun-green-600 transition-colors w-full md:w-auto shrink-0 shadow-sm"
                     >
-                      <Download size={16} /> Baixar Relatório PDF
+                      <MapPin size={16} className="text-sun-green-600" />
+                      Encontrar instalador local
                     </button>
                   </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-100">
+                      <thead>
+                        <tr className="border-b border-black/10">
+                          <th className="text-left text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] py-3 px-2 sm:px-4">Mês</th>
+                          <th className="text-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] py-3 px-2 sm:px-4">
+                            Radiação Solar<br /><span className="font-normal text-[#6b6a64]/70">(kWh/m²/dia)</span>
+                          </th>
+                          <th className="text-right text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-[#6b6a64] py-3 px-2 sm:px-4">
+                            Energia CA<br /><span className="font-normal text-[#6b6a64]/70">(kWh)</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {MONTH_NAMES.map((name, i) => (
+                          <tr key={name} className="border-b border-black/5 hover:bg-black/[0.02] transition-colors">
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-sun-text">{name}</td>
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-sun-text text-center">{result.outputs.solrad_monthly[i].toFixed(2)}</td>
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-sun-green-600 text-right">{Math.round(result.outputs.ac_monthly[i]).toLocaleString("pt-BR")}</td>
+                          </tr>
+                        ))}
+                        <tr className="border-t-2 border-sun-green-600/30 bg-green-50">
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-black text-sun-green-600">Anual</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-bold text-sun-green-600 text-center">{result.outputs.solrad_annual.toFixed(2)}</td>
+                          <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-black text-sun-green-600 text-right">{Math.round(result.outputs.ac_annual).toLocaleString("pt-BR")}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
 
-          {activeTab === "salvos" && (
-            <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-12 text-center">
-              <Bookmark size={48} className="text-gray-700 mx-auto mb-4" />
-              <h3 className="text-lg font-black text-gray-400">Nenhum cálculo salvo</h3>
-            </div>
-          )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                  <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 space-y-4 shadow-sm">
+                    <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-sun-green-600">Identificação da Estação</h2>
+                    <div className="space-y-3 text-xs sm:text-sm">
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Localização</span>
+                        <span className="text-sun-text font-bold text-right max-w-[60%] truncate">{reverseAddress || form.address || `${form.lat}, ${form.lon}`}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Estação NSRDB</span>
+                        <span className="text-sun-text font-bold">{result.station_info.city ? result.station_info.city + ", " : ""}{result.station_info.state}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Lat NSRDB</span>
+                        <span className="text-sun-text font-bold">{result.station_info.lat.toFixed(4)}°</span>
+                      </div>
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Lon NSRDB</span>
+                        <span className="text-sun-text font-bold">{result.station_info.lon.toFixed(4)}°</span>
+                      </div>
+                    </div>
+                  </div>
 
-          {activeTab === "clientes" && (
-            <div className="bg-[#1a1f2e] rounded-2xl border border-gray-800 p-12 text-center">
-              <ExternalLink size={48} className="text-gray-700 mx-auto mb-4" />
-              <h3 className="text-lg font-black text-gray-400">Nenhum cliente ativo</h3>
-            </div>
-          )}
+                  <div className="bg-white rounded-2xl border border-black/5 p-5 sm:p-6 space-y-4 shadow-sm">
+                    <h2 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-sun-green-600">Métricas Principais</h2>
+                    <div className="space-y-3 text-xs sm:text-sm">
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Fator de capacidade</span>
+                        <span className="text-sun-text font-bold">{result.outputs.capacity_factor.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Tamanho do Sistema</span>
+                        <span className="text-sun-text font-bold">{form.system_capacity} kWp</span>
+                      </div>
+                      <div className="flex justify-between border-b border-black/5 pb-2">
+                        <span className="text-[#6b6a64]">Perdas Configuradas</span>
+                        <span className="text-sun-text font-bold">{form.losses}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    onClick={generatePDF}
+                    className="w-full sm:w-auto flex justify-center items-center gap-2 px-6 py-3 bg-green-50 hover:bg-green-100 text-sun-green-600 border border-green-200 rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all hover:-translate-y-0.5"
+                  >
+                    <Download size={16} /> Baixar Relatório PDF
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>

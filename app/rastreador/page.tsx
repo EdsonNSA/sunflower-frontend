@@ -5,9 +5,11 @@ import Link from "next/link";
 import {
   Crosshair, Zap, Wifi, WifiOff, Trophy, RotateCcw,
   Activity, LayoutDashboard, MapPin, Globe, TableProperties,
-  Calculator, FileText, Clock, MoreHorizontal
+  Calculator, FileText, Clock, MoreHorizontal, Radio, Usb,
+  ServerCrash, CheckCircle2
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useMqttData } from "@/components/hooks/useMqttData";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface SolarData {
@@ -23,6 +25,8 @@ interface SolarData {
   ldr_baixo_dir: number;
   timestamp: number;
 }
+
+type ConnectionMode = "mqtt" | "usb";
 
 const HISTORY_MAX = 60; // pontos no histórico de tensão
 
@@ -109,16 +113,46 @@ function Sparkline({ data }: { data: number[] }) {
 }
 
 // ─── NavLink (Padrão Ouro) ────────────────────────────────────────────────────
-function NavLink({ href, icon: Icon, label, active = false, isMobileHidden = false }: { href: string; icon: any; label: string; active?: boolean; isMobileHidden?: boolean }) {
+function NavLink({ href, icon: Icon, label, active = false, isMobileHidden = false }: { href: string; icon: React.ElementType; label: string; active?: boolean; isMobileHidden?: boolean }) {
   return (
     <Link href={href} className={`
       flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 group flex-1 md:flex-initial
       ${active ? "bg-sun-green-600 text-white shadow-md" : "text-sun-text hover:bg-black/5"}
       ${isMobileHidden ? 'hidden md:flex' : 'flex'}
     `}>
-      <Icon size={16} className={`${active ? "text-sun-amber-400" : "text-sun-green-600 group-hover:scale-110"} transition-transform flex-shrink-0 sm:w-[18px] sm:h-[18px]`} />
+      <Icon size={16} className={`${active ? "text-sun-amber-400" : "text-sun-green-600 group-hover:scale-110"} transition-transform shrink-0 sm:w-4.5 sm:h-4.5`} />
       <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider whitespace-nowrap">{label}</span>
     </Link>
+  );
+}
+
+// ─── Toggle USB / MQTT ────────────────────────────────────────────────────────
+function ModeToggle({ mode, onChange }: { mode: ConnectionMode; onChange: (m: ConnectionMode) => void }) {
+  return (
+    <div className="flex items-center bg-[#eeede8] rounded-full p-1 border border-black/5 shadow-inner">
+      <button
+        onClick={() => onChange("mqtt")}
+        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.12em] transition-all duration-200 ${
+          mode === "mqtt"
+            ? "bg-sun-green-600 text-white shadow-md"
+            : "text-[#6b6a64] hover:text-sun-text"
+        }`}
+      >
+        <Radio size={12} />
+        MQTT
+      </button>
+      <button
+        onClick={() => onChange("usb")}
+        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.12em] transition-all duration-200 ${
+          mode === "usb"
+            ? "bg-amber-500 text-white shadow-md"
+            : "text-[#6b6a64] hover:text-sun-text"
+        }`}
+      >
+        <Usb size={12} />
+        USB
+      </button>
+    </div>
   );
 }
 
@@ -126,16 +160,28 @@ function NavLink({ href, icon: Icon, label, active = false, isMobileHidden = fal
 export default function RastreadorPage() {
   const [currentDateTime, setCurrentDateTime] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [data, setData] = useState<SolarData | null>(null);
-  const [history, setHistory] = useState<number[]>([]);
-  const [log, setLog] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ConnectionMode>("mqtt");
+
+  // ── Estado USB (Web Serial) ──
+  const [usbConnected, setUsbConnected] = useState(false);
+  const [usbConnecting, setUsbConnecting] = useState(false);
+  const [usbData, setUsbData] = useState<SolarData | null>(null);
+  const [usbHistory, setUsbHistory] = useState<number[]>([]);
+  const [usbLog, setUsbLog] = useState<string[]>([]);
+  const [usbError, setUsbError] = useState<string | null>(null);
 
   const portRef = useRef<SerialPort | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<string> | null>(null);
+
+  // ── Estado MQTT (via hook) ──
+  const mqtt = useMqttData();
+
+  // ── Selecionar dados com base no modo ──
+  const connected = mode === "mqtt" ? mqtt.sseConnected : usbConnected;
+  const data: SolarData | null = mode === "mqtt" ? (mqtt.data as SolarData | null) : usbData;
+  const history = mode === "mqtt" ? mqtt.history : usbHistory;
+  const log = mode === "mqtt" ? mqtt.log : usbLog;
+  const error = mode === "usb" ? usbError : null;
 
   // Relógio ao vivo - PADRÃO: 17 DE JUN. • 17:31
   useEffect(() => {
@@ -151,32 +197,37 @@ export default function RastreadorPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Adiciona linha ao log (últimas 8)
-  const addLog = useCallback((msg: string) => {
-    setLog((prev) => [...prev.slice(-7), msg]);
+  // Adiciona linha ao log USB (últimas 8)
+  const addUsbLog = useCallback((msg: string) => {
+    setUsbLog((prev) => [...prev.slice(-7), msg]);
   }, []);
 
   // ── Conectar via Web Serial API ───────────────────────────────────────────
-  const connect = useCallback(async () => {
+  const connectUsb = useCallback(async () => {
     if (!("serial" in navigator)) {
-      setError("Web Serial API não suportada. Use Chrome ou Edge.");
+      setUsbError("Web Serial API não suportada. Use Chrome ou Edge.");
       return;
     }
     try {
-      setConnecting(true);
-      setError(null);
+      setUsbConnecting(true);
+      setUsbError(null);
 
-      const port = await (navigator as any).serial.requestPort();
+      const port = await (navigator as unknown as { serial: { requestPort: () => Promise<SerialPort> } }).serial.requestPort();
       await port.open({ baudRate: 9600 });
       portRef.current = port;
 
       const decoder = new TextDecoderStream();
-      port.readable.pipeTo(decoder.writable);
+      if (!port.readable) {
+        setUsbError("Porta serial não possui stream legível.");
+        setUsbConnecting(false);
+        return;
+      }
+      port.readable.pipeTo(decoder.writable as WritableStream<Uint8Array>);
       const reader = decoder.readable.getReader();
       readerRef.current = reader;
 
-      setConnected(true);
-      addLog("✅ Porta serial conectada — aguardando dados do Arduino...");
+      setUsbConnected(true);
+      addUsbLog("✅ Porta serial conectada — aguardando dados do Arduino...");
 
       let buffer = "";
 
@@ -198,8 +249,8 @@ export default function RastreadorPage() {
               try {
                 const parsed = JSON.parse(line) as Omit<SolarData, "timestamp">;
                 const entry: SolarData = { ...parsed, timestamp: Date.now() };
-                setData(entry);
-                setHistory((prev) => {
+                setUsbData(entry);
+                setUsbHistory((prev) => {
                   const next = [...prev, parsed.tensao_mv];
                   return next.length > HISTORY_MAX ? next.slice(-HISTORY_MAX) : next;
                 });
@@ -209,35 +260,47 @@ export default function RastreadorPage() {
             }
           }
         } catch {
-          addLog("🔌 Leitura encerrada.");
+          addUsbLog("🔌 Leitura encerrada.");
         } finally {
-          setConnected(false);
+          setUsbConnected(false);
         }
       })();
-    } catch (e: any) {
-      setError(e?.message ?? "Falha ao abrir porta serial.");
-      setConnecting(false);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Falha ao abrir porta serial.";
+      setUsbError(message);
+      setUsbConnecting(false);
     } finally {
-      setConnecting(false);
+      setUsbConnecting(false);
     }
-  }, [addLog]);
+  }, [addUsbLog]);
 
-  // ── Desconectar ───────────────────────────────────────────────────────────
-  const disconnect = useCallback(async () => {
+  // ── Desconectar USB ───────────────────────────────────────────────────────
+  const disconnectUsb = useCallback(async () => {
     try {
       await readerRef.current?.cancel();
       await portRef.current?.close();
     } catch {}
-    setConnected(false);
-    addLog("🔌 Desconectado.");
-  }, [addLog]);
+    setUsbConnected(false);
+    addUsbLog("🔌 Desconectado.");
+  }, [addUsbLog]);
 
-  // ── Reset do melhor ângulo ────────────────────────────────────────────────
+  // ── Reset do histórico ────────────────────────────────────────────────────
   const resetHistory = useCallback(() => {
-    setHistory([]);
-    setData(null);
-    addLog("🔄 Histórico local limpo — rastreador continua no Arduino.");
-  }, [addLog]);
+    if (mode === "mqtt") {
+      mqtt.resetHistory();
+    } else {
+      setUsbHistory([]);
+      setUsbData(null);
+      addUsbLog("🔄 Histórico local limpo — rastreador continua no Arduino.");
+    }
+  }, [mode, mqtt, addUsbLog]);
+
+  // ── Reset do melhor ângulo (MQTT) ──────────────────────────────────────────
+  const sendReset = useCallback(async () => {
+    if (mode === "mqtt") {
+      await mqtt.sendCommand("reset");
+    }
+  }, [mode, mqtt]);
 
   // Auxiliares visuais
   const fmtV = (mv: number) => (mv / 1000).toFixed(3) + " V";
@@ -289,7 +352,7 @@ export default function RastreadorPage() {
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl w-full transition-all duration-200 text-sun-text hover:bg-black/5 ${isMenuOpen ? 'bg-black/5' : ''}`}
                   >
-                    <MoreHorizontal size={16} className="text-sun-green-600 flex-shrink-0" />
+                    <MoreHorizontal size={16} className="text-sun-green-600 shrink-0" />
                     <span className="text-[9px] font-black uppercase tracking-wider">Mais</span>
                   </button>
                   
@@ -317,7 +380,7 @@ export default function RastreadorPage() {
                 </div>
                 <div className="w-px h-3.5 bg-black/10 hidden sm:block" />
                 <div className="flex items-center gap-1.5 text-[#6b6a64]">
-                  <Clock size={12} className="sm:size-[14px]" />
+                  <Clock size={12} className="sm:size-3.5" />
                   <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">{currentDateTime}</span>
                 </div>
               </div>
@@ -351,45 +414,100 @@ export default function RastreadorPage() {
         
         {/* BARRA DE CONTROLE DO HARDWARE */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-4 py-4 rounded-2xl border border-black/10 shadow-sm gap-4">
-          <div>
-            <h2 className="text-sm font-black text-sun-text uppercase tracking-wider">Controle do Arduino</h2>
-            <p className="text-[10px] font-bold text-[#6b6a64] uppercase tracking-widest mt-0.5">Interface Web Serial API</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-sm font-black text-sun-text uppercase tracking-wider">
+                {mode === "mqtt" ? "Rastreador Solar" : "Controle do Arduino"}
+              </h2>
+              <p className="text-[10px] font-bold text-[#6b6a64] uppercase tracking-widest mt-0.5">
+                {mode === "mqtt" ? "MQTT · Mosquitto · WiFi" : "Interface Web Serial API · USB"}
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center flex-wrap gap-3">
-            {/* Status Visual */}
-            <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full shadow-sm border ${connected ? "bg-green-50 border-green-200" : "bg-[#f9f9f7] border-black/10"}`}>
-              <div className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-300"}`} />
-              <span className="text-[10px] font-black uppercase tracking-[0.15em] text-sun-text">
-                {connected ? "Conectado" : "Desconectado"}
-              </span>
-            </div>
+            {/* Toggle USB / MQTT */}
+            <ModeToggle mode={mode} onChange={setMode} />
 
-            {/* Botão Conectar/Desconectar */}
-            {!connected ? (
-              <button
-                onClick={connect}
-                disabled={connecting}
-                className="flex items-center gap-2 bg-sun-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Wifi size={14} />
-                <span className="text-[10px] font-black uppercase tracking-[0.15em]">
-                  {connecting ? "Conectando..." : "Conectar Arduino"}
-                </span>
-              </button>
+            {/* ── Status e controles dinâmicos por modo ── */}
+            {mode === "mqtt" ? (
+              <>
+                {/* Status do broker */}
+                <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full shadow-sm border ${
+                  mqtt.mqttStatus.brokerConnected ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+                }`}>
+                  {mqtt.mqttStatus.brokerConnected ? (
+                    <CheckCircle2 size={14} className="text-green-600" />
+                  ) : (
+                    <ServerCrash size={14} className="text-red-500" />
+                  )}
+                  <span className="text-[10px] font-black uppercase tracking-[0.12em] text-sun-text">
+                    Broker {mqtt.mqttStatus.brokerConnected ? "OK" : "Off"}
+                  </span>
+                </div>
+
+                {/* Status do ESP32 */}
+                <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full shadow-sm border ${
+                  mqtt.mqttStatus.espOnline ? "bg-green-50 border-green-200" : "bg-[#f9f9f7] border-black/10"
+                }`}>
+                  <div className={`w-2.5 h-2.5 rounded-full ${
+                    mqtt.mqttStatus.espOnline 
+                      ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
+                      : "bg-gray-300"
+                  }`} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.12em] text-sun-text">
+                    ESP32 {mqtt.mqttStatus.espOnline ? "Online" : "Offline"}
+                  </span>
+                </div>
+
+                {/* Botão reset via MQTT */}
+                <button
+                  onClick={sendReset}
+                  className="flex items-center gap-2 bg-white border border-black/10 px-4 py-2 rounded-full shadow-sm hover:bg-gray-50 transition-all"
+                >
+                  <RotateCcw size={14} className="text-[#6b6a64]" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-sun-text">
+                    Reset ESP32
+                  </span>
+                </button>
+              </>
             ) : (
-              <button
-                onClick={disconnect}
-                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-full shadow-md transition-all hover:-translate-y-0.5"
-              >
-                <WifiOff size={14} />
-                <span className="text-[10px] font-black uppercase tracking-[0.15em]">
-                  Desconectar
-                </span>
-              </button>
+              <>
+                {/* Status Visual USB */}
+                <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full shadow-sm border ${usbConnected ? "bg-green-50 border-green-200" : "bg-[#f9f9f7] border-black/10"}`}>
+                  <div className={`w-2.5 h-2.5 rounded-full ${usbConnected ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-300"}`} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-sun-text">
+                    {usbConnected ? "Conectado" : "Desconectado"}
+                  </span>
+                </div>
+
+                {/* Botão Conectar/Desconectar USB */}
+                {!usbConnected ? (
+                  <button
+                    onClick={connectUsb}
+                    disabled={usbConnecting}
+                    className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-full shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Wifi size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]">
+                      {usbConnecting ? "Conectando..." : "Conectar Arduino"}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={disconnectUsb}
+                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-full shadow-md transition-all hover:-translate-y-0.5"
+                  >
+                    <WifiOff size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]">
+                      Desconectar
+                    </span>
+                  </button>
+                )}
+              </>
             )}
 
-            {/* Reset */}
+            {/* Reset de histórico (ambos os modos) */}
             <button
               onClick={resetHistory}
               className="flex items-center gap-2 bg-white border border-black/10 px-4 py-2 rounded-full shadow-sm hover:bg-gray-50 transition-all"
@@ -402,7 +520,7 @@ export default function RastreadorPage() {
           </div>
         </div>
 
-        {/* Erro Geral */}
+        {/* Erro Geral (USB only) */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-3 rounded-xl text-sm font-bold">
             ⚠️ {error}
@@ -414,18 +532,59 @@ export default function RastreadorPage() {
           <Card className="border-black/5 shadow-sm rounded-xl bg-white">
             <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
               <div className="w-20 h-20 bg-[#eeede8] rounded-full flex items-center justify-center">
-                <Wifi size={40} className="text-[#6b6a64]" />
+                {mode === "mqtt" ? (
+                  <Radio size={40} className="text-[#6b6a64]" />
+                ) : (
+                  <Wifi size={40} className="text-[#6b6a64]" />
+                )}
               </div>
-              <h2 className="text-xl font-black text-sun-text">Aguardando conexão</h2>
-              <p className="text-sm font-bold text-[#6b6a64] max-w-md">
-                Conecte o Arduino ao computador via USB, grave o firmware <code className="bg-[#eeede8] px-1.5 py-0.5 rounded font-mono text-xs">projeto-rastreador-solar.ino</code> e clique em <strong>Conectar Arduino</strong> na barra acima.
-              </p>
-              <div className="flex flex-col items-start gap-2 bg-[#eeede8] px-6 py-4 rounded-xl text-left text-sm font-bold text-[#4a4944] mt-2">
-                <span>1. Grave o código base no Arduino via IDE</span>
-                <span>2. Mantenha o cabo USB conectado ao computador</span>
-                <span>3. Clique no botão verde de Conexão</span>
-                <span>4. Permita o acesso à porta serial (ex: COM3, /dev/ttyUSB0) no prompt do navegador</span>
-              </div>
+              <h2 className="text-xl font-black text-sun-text">
+                {mode === "mqtt" ? "Aguardando ESP32 via MQTT" : "Aguardando conexão USB"}
+              </h2>
+              
+              {mode === "mqtt" ? (
+                <>
+                  <p className="text-sm font-bold text-[#6b6a64] max-w-md">
+                    O sistema está aguardando dados do ESP32 via WiFi/MQTT. Certifique-se de que o broker Mosquitto e o ESP32 estão ativos.
+                  </p>
+                  <div className="flex flex-col items-start gap-2 bg-[#eeede8] px-6 py-4 rounded-xl text-left text-sm font-bold text-[#4a4944] mt-2">
+                    <span>1. Inicie o Mosquitto: <code className="bg-white px-1.5 py-0.5 rounded font-mono text-xs">mosquitto -v -c mosquitto/mosquitto.conf</code></span>
+                    <span>2. Grave o firmware na ESP32 com suas credenciais WiFi</span>
+                    <span>3. A ESP32 vai conectar automaticamente ao broker</span>
+                    <span>4. Os dados aparecerão aqui em tempo real</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-3">
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      mqtt.mqttStatus.brokerConnected 
+                        ? "bg-green-50 border border-green-200 text-green-700" 
+                        : "bg-red-50 border border-red-200 text-red-600"
+                    }`}>
+                      {mqtt.mqttStatus.brokerConnected ? <CheckCircle2 size={12} /> : <ServerCrash size={12} />}
+                      Broker: {mqtt.mqttStatus.brokerConnected ? "Conectado" : "Desconectado"}
+                    </div>
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      mqtt.mqttStatus.espOnline 
+                        ? "bg-green-50 border border-green-200 text-green-700" 
+                        : "bg-[#f9f9f7] border border-black/10 text-[#6b6a64]"
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${mqtt.mqttStatus.espOnline ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+                      ESP32: {mqtt.mqttStatus.espOnline ? "Online" : "Offline"}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-bold text-[#6b6a64] max-w-md">
+                    Conecte o Arduino ao computador via USB, grave o firmware <code className="bg-[#eeede8] px-1.5 py-0.5 rounded font-mono text-xs">projeto-rastreador-solar.ino</code> e clique em <strong>Conectar Arduino</strong> na barra acima.
+                  </p>
+                  <div className="flex flex-col items-start gap-2 bg-[#eeede8] px-6 py-4 rounded-xl text-left text-sm font-bold text-[#4a4944] mt-2">
+                    <span>1. Grave o código base no Arduino via IDE</span>
+                    <span>2. Mantenha o cabo USB conectado ao computador</span>
+                    <span>3. Clique no botão verde de Conexão</span>
+                    <span>4. Permita o acesso à porta serial (ex: COM3, /dev/ttyUSB0) no prompt do navegador</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
@@ -551,11 +710,11 @@ export default function RastreadorPage() {
               </Card>
             </div>
 
-            {/* ── Log Serial ── */}
+            {/* ── Log de Conexão ── */}
             <Card className="border-black/5 shadow-sm rounded-xl bg-white">
               <CardContent className="p-6">
                 <h3 className="text-[11px] uppercase font-black text-sun-text tracking-[0.2em] mb-3">
-                  Log de Conexão
+                  Log de Conexão {mode === "mqtt" ? "(MQTT/SSE)" : "(Serial USB)"}
                 </h3>
                 <div className="bg-[#0f1419] rounded-xl p-4 font-mono text-[10px] sm:text-[11px] text-green-400 space-y-1 min-h-20 overflow-x-auto">
                   {log.map((l, i) => (
